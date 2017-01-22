@@ -2,44 +2,32 @@ module Main where
 
 import FileSearch
 import System.Environment
-import qualified Data.Map as M
 import System.Console.ANSI
+import Data.Monoid
 
-screenmplayer = "screen -d -m mplayer"
-screenmplayerpls = "screen -d -m mplayer -playlist"
 
 fileTypes :: FileAssociation
-fileTypes = M.fromList [
-    ("mp3",screenmplayer)
-  , ("mp4",screenmplayer)
-  , ("avi", screenmplayer)
-  , ("mkv", screenmplayer)
-  , ("wav", screenmplayer)
-  , ("flv", screenmplayer)
-  , ("webm", screenmplayer)
-  , ("pls", screenmplayerpls)
-  , ("pdf", "zathura")
-  , ("djvu", "zathura")
-  , ("epub", "ebook-viewer")
-  , ("ps", "zathura")
-  , ("dvi", "zathura")
-  , ("cbz", "mcomix")
-  , ("cbr", "mcomix")
-  , ("tex", "emacs24")
-                   ]
+fileTypes =
+     shComm "zathura" ["pdf", "djvu", "ps", "dvi"]
+  <> shComm "screen -d -m mplayer" ["mp3", "mp4", "webm", "flv", "wav", "avi"]
+  <> shComm "screen -d -m mplayer -playlist" ["pls"]
+  <> shComm "mcomix" ["cbr", "cbz"]
+  <> shComm "emacs24" ["tex", "hs"]
+  <> shComm "ebook-viewer" ["epub"]
+  <> shComm "chromium-browser" ["html"]
 
-fileDB = "/home/shane/db/files" 
+
+fileDB = "/home/shane/db/files"
+printQFile = "/home/shane/printQ"
 
 mySettings = defaultSettings {
-    listFgColour = (Vivid, Blue)
-  , queryFgColour = (Vivid, Yellow)
-  , errorFgColour = (Vivid, Red)
-  , listBgColour = (Dull, Black)
-  , queryBgColour = (Dull, Black)
-  , errorBgColour = (Dull, Black)
+    listColour = fg Vivid Blue <> bg Dull Black
+  , queryColour = fg Vivid Yellow
+  , errorColour = fg Vivid Red
+  , loadEntireDatabase = True
                              }
 
 
 main :: IO ()
-main = do as <- getArgs
-          opeFile mySettings fileDB fileTypes (unwords as)
+main = do a@(n:m) <- getArgs
+          if n /= "p" then opeFile mySettings fileDB fileTypes ( unwords a) else  printQ mySettings fileDB printQFile (unwords m)

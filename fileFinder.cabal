@@ -27,6 +27,7 @@ library
                      , pipes-safe
                      , text
                      , ansi-terminal
+                     , mtl
   default-language:    Haskell2010
 
 executable fileFinder-exe
@@ -45,6 +46,7 @@ executable fileFinder-exe
                      , pipes-safe
                      , text
                      , ansi-terminal
+                     , mtl
   default-language:    Haskell2010
 
 test-suite fileFinder-test
@@ -63,6 +65,7 @@ test-suite fileFinder-test
                      , pipes-safe
                      , text
                      , ansi-terminal
+                     , mtl
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
