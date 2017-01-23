@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 module FileSearch
     (
       opeFile
@@ -10,23 +10,24 @@ module FileSearch
     , errorColour
     , loadEntireDatabase
     , printQ
-    , emptyAssoc
-    , shComm
     , fg
     , bg
+    , simpleCommand
+    , usingMonoid
+    , usingList
     ) where
 
 import Data.Monoid
+import EitherExtras
 import Data.Char
+import Data.List
+import Control.Applicative
 import Data.List.Split
 import Control.Monad.Trans.Either
 import Control.Monad.Except
-import Control.Monad
-import Control.Monad.IO.Class
 import System.Process
 import Pipes
 import qualified Pipes.Prelude as R
-import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import System.IO
@@ -43,33 +44,40 @@ data Settings = Settings {
                          }
 
 
+defaultSettings :: Settings
 defaultSettings = Settings
   {
    listColour = fg Vivid Green
  , queryColour = fg Vivid Yellow
- , outputColour = fg Dull Black
+ , outputColour = fg Dull Green
  , errorColour = fg Dull Black
  , loadEntireDatabase = False
 }
 
-keepSearching s ns = runEitherT . keepSearching' s ns
 
-keepSearching' :: Settings -> [T.Text] -> T.Text -> EitherIO String FilePath
-keepSearching' s ns n = case rs of
+keepSearching :: (MonadIO m, MonadError String m) => Settings -> [T.Text] -> T.Text -> m FilePath
+keepSearching s ns n = case rs of
                           [] -> throwError $ "Cannot find the file " ++ T.unpack n
                           [a] -> pure $ T.unpack a
-                          _ -> enumeratePrint (listColour s)  rs >> askMore (queryColour s)  >>= keepSearching' s rs
+                          _ -> enumeratePrint (listColour s)  rs >> askMore (queryColour s)  >>= keepSearching s rs
   where rs = restrict n ns
 
 
+enumeratePrint :: MonadIO m => [SGR] -> [T.Text] -> m ()
 enumeratePrint fc s = liftIO $ setSGR fc >> (mapM_ TIO.putStrLn . zipWith (\a b -> a <> ": " <> b) (map (T.pack . show) [0..])) s
 
 
+askMore :: MonadIO m => [SGR] -> m T.Text
 askMore fc = liftIO $ setSGR fc >> TIO.putStrLn "? " >> TIO.getLine
 
-
+vivid :: Color -> [SGR]
 vivid x = [SetColor Foreground Vivid x]
+
+fg :: ColorIntensity -> Color -> [SGR]
 fg v c = [SetColor Foreground v c]
+
+
+bg :: ColorIntensity -> Color -> [SGR]
 bg v c = [SetColor Background v c]
 
 restrict :: T.Text -> [T.Text] -> [T.Text]
@@ -85,36 +93,48 @@ getExtension :: FilePath -> String
 getExtension = last . splitOn "."
 
 
-type FileAssociation = String -> Maybe [FilePath]
-
-shComm :: FilePath -> [String] -> FileAssociation
-shComm a es e = if e `elem` es then Just (words a) else Nothing
-
-emptyAssoc = M.empty
+type FileExtension = String
+type FileAssociation f = FileExtension -> f (FilePath -> CreateProcess)
 
 
+usingList :: [FileAssociation Maybe] -> FileAssociation Maybe
+usingList fs s = foldl1' (<|>) $ map ($ s) fs
 
-------
+
+simpleCommand :: Alternative f => FilePath -> [FileExtension] -> FileAssociation f
+simpleCommand p es e |  e `elem` es = pure (\fp -> proc h (t++[fp]))
+                     | otherwise = empty
+  where (h:t) = words p
+
+
+usingMonoid  :: (FileExtension -> Alt Maybe (FilePath -> CreateProcess)) -> FileAssociation Maybe
+usingMonoid x = getAlt . x
 
 
 
-findProgram :: FileAssociation -> String -> Either String ([String], FilePath)
-findProgram m s = let ext = getExtension s in
-                    case m ext of
-                      Nothing -> throwError $ "Could not find a suitable program for the extension " ++ ext
-                      Just x -> pure (x, s)
 
+findProgram :: MaybeType f => FileAssociation f -> String -> Either String (CreateProcess, FilePath)
+findProgram m s = ( \t -> (t s, s) ) <$> maybeToEither "Could not find a suitable program for the extension" (m ext)
+  where ext = getExtension s
+
+
+
+findProg :: MaybeType f => FileAssociation f -> String -> EitherIO String (CreateProcess, FilePath)
 findProg m = hoistEither . findProgram m
 
 
-
-
+opeFile :: MaybeType f => Settings -> FilePath -> FileAssociation f -> String -> IO ()
 opeFile s' f m t = do fs <- (if (loadEntireDatabase s') then getFirstList' else getFirstList) f s
-                      r <- runEitherT $ (keepSearching' s' fs s) >>= findProg m
+                      r <- runEitherT $ (keepSearching s' fs s) >>= findProg m
                       case r of
-                        Right (x, s) -> let (h:t) = x in spawnProcess h (t++[s]) >> setSGR (outputColour s') >> putStrLn s
+                        Right (x, s'') -> do _ <- createProcess x
+                                             setSGR (outputColour s')
+                                             putStrLn s''
                         Left s -> setSGR (errorColour s') >> hPutStrLn stdout s
   where s = T.pack t
+
+
+
 
 
 firstListPipe :: FilePath -> T.Text -> Producer T.Text IO ()
@@ -146,18 +166,14 @@ read' file = do
 
 --- Experimental...for printer dialogue
 
-data Pages = PageRaw String | OnePage Int | PageRange Int Int | PageList [Pages] | AllPages
-
-getPages :: String -> EitherIO String Pages
-getPages "" = pure AllPages
-getPages n = case words n of
-  [m] -> pure $ OnePage (read m)
 
 
-
+printQ :: Settings -> FilePath -> FilePath -> String -> IO ()
 printQ s' f f' t = do fs <- (if (loadEntireDatabase s') then getFirstList' else getFirstList) f s
-                      r <- runEitherT $ (keepSearching' s' fs s)
+                      r <- runEitherT $ (keepSearching s' fs s)
                       case r of
-                        Right x -> appendFile f' x
+                        Right x -> appendFile f' (x ++ "\n")
                         Left s -> setSGR (errorColour s') >> hPutStrLn stdout s
   where s = T.pack t
+
+

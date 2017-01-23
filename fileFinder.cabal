@@ -16,6 +16,7 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     FileSearch
+                     , EitherExtras
   build-depends:       base >= 4.7 && < 5
                      , transformers >= 0.5
                      , containers

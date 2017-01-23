@@ -6,15 +6,14 @@ import System.Console.ANSI
 import Data.Monoid
 
 
-fileTypes :: FileAssociation
-fileTypes =
-     shComm "zathura" ["pdf", "djvu", "ps", "dvi"]
-  <> shComm "screen -d -m mplayer" ["mp3", "mp4", "webm", "flv", "wav", "avi"]
-  <> shComm "screen -d -m mplayer -playlist" ["pls"]
-  <> shComm "mcomix" ["cbr", "cbz"]
-  <> shComm "emacs24" ["tex", "hs"]
-  <> shComm "ebook-viewer" ["epub"]
-  <> shComm "chromium-browser" ["html"]
+fileTypes = usingMonoid $
+     simpleCommand "zathura" ["pdf", "djvu", "ps", "dvi"]
+  <> simpleCommand "screen -d -m mplayer -input file=/home/shane/mplayerfifo" ["mp3", "mp4", "webm", "flv", "wav", "avi"]
+  <> simpleCommand "screen -d -m mplayer -playlist -input file=/home/shane/mplayerfifo" ["pls"]
+  <> simpleCommand "mcomix" ["cbr", "cbz"]
+  <> simpleCommand "emacs24" ["tex", "hs"]
+  <> simpleCommand "ebook-viewer" ["epub"]
+  <> simpleCommand "chromium-browser" ["html"]
 
 
 fileDB = "/home/shane/db/files"
