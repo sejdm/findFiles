@@ -13,6 +13,7 @@ module FileSearch
     , fg
     , bg
     , simpleCommand
+    , (.=)
     , usingMonoid
     , usingList
     ) where
@@ -31,7 +32,9 @@ import qualified Pipes.Prelude as R
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import System.IO
+import System.Exit
 import System.Console.ANSI
+import Control.Exception
 
 type EitherIO s = EitherT s IO
 
@@ -54,6 +57,12 @@ defaultSettings = Settings
  , loadEntireDatabase = False
 }
 
+keepSearching'' f s = 
+  do (e , o, _) <- liftIO $ readCreateProcessWithExitCode (shell ("cat " ++ f ++ " | fzf -q '" ++ T.unpack s ++ "'")) ""
+     if e == ExitSuccess then return o else throwError "Cannot find the file " 
+
+keepSearching' f s = do x <- liftIO $ fmap (reverse . tail . reverse) $ catch (readCreateProcess (shell ("cat " ++ f ++ " | fzf -q '" ++ T.unpack s ++ "'")) "") ((\_ -> return "a") :: IOError -> IO String)
+                        if x == "" then throwError "Cannot find the file" else return x
 
 keepSearching :: (MonadIO m, MonadError String m) => Settings -> [T.Text] -> T.Text -> m FilePath
 keepSearching s ns n = case rs of
@@ -106,6 +115,8 @@ simpleCommand p es e |  e `elem` es = pure (\fp -> proc h (t++[fp]))
                      | otherwise = empty
   where (h:t) = words p
 
+(.=) :: Alternative f => FilePath -> [FileExtension] -> FileAssociation f
+(.=) = simpleCommand
 
 usingMonoid  :: (FileExtension -> Alt Maybe (FilePath -> CreateProcess)) -> FileAssociation Maybe
 usingMonoid x = getAlt . x
@@ -118,14 +129,13 @@ findProgram m s = ( \t -> (t s, s) ) <$> maybeToEither "Could not find a suitabl
   where ext = getExtension s
 
 
-
 findProg :: MaybeType f => FileAssociation f -> String -> EitherIO String (CreateProcess, FilePath)
 findProg m = hoistEither . findProgram m
 
 
 opeFile :: MaybeType f => Settings -> FilePath -> FileAssociation f -> String -> IO ()
 opeFile s' f m t = do fs <- (if (loadEntireDatabase s') then getFirstList' else getFirstList) f s
-                      r <- runEitherT $ (keepSearching s' fs s) >>= findProg m
+                      r <- runEitherT $ (keepSearching' f s) >>= findProg m
                       case r of
                         Right (x, s'') -> do _ <- createProcess x
                                              setSGR (outputColour s')

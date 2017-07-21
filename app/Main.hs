@@ -7,21 +7,22 @@ import Data.Monoid
 
 
 fileTypes = usingMonoid $
-     simpleCommand "zathura" ["pdf", "djvu", "ps", "dvi"]
-  <> simpleCommand "screen -d -m mplayer -input file=/home/shane/mplayerfifo" ["mp3", "mp4", "webm", "flv", "wav", "avi"]
-  <> simpleCommand "screen -d -m mplayer -playlist -input file=/home/shane/mplayerfifo" ["pls"]
-  <> simpleCommand "mcomix" ["cbr", "cbz"]
-  <> simpleCommand "emacs24" ["tex", "hs"]
-  <> simpleCommand "ebook-viewer" ["epub"]
-  <> simpleCommand "chromium-browser" ["html"]
+    "zathura" .= ["pdf", "djvu", "ps", "dvi"]
+  -- <> "screen -d -m mpv -input file=/home/shane/mplayerfifo" .= ["mp3", "mp4", "webm", "flv", "wav", "avi"]
+  <> "tmux new -s Media -d mpv --audio-display=no -input file=/home/shane/mplayerfifo" .= ["mp3", "mp4", "webm", "flv", "wav", "avi"]
+  <> "tmux new -s Media -d mpv --audio-display=no -input file=/home/shane/mplayerfifo -playlist" .= ["pls"]
+  <> "mcomix" .= ["cbr", "cbz"]
+  <> "emacs24" .= ["tex", "hs"]
+  <> "ebook-viewer" .= ["epub", "mobi"]
+  <> "chromium-browser" .= ["html"]
 
 
 fileDB = "/home/shane/db/files"
 printQFile = "/home/shane/printQ"
 
 mySettings = defaultSettings {
-    listColour = fg Vivid Blue <> bg Dull Black
-  , queryColour = fg Vivid Yellow
+    listColour = fg Dull Blue
+  , queryColour = fg Dull Green
   , errorColour = fg Vivid Red
   , loadEntireDatabase = True
                              }

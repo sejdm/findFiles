@@ -34,7 +34,7 @@ library
 executable fileFinder-exe
   hs-source-dirs:      app
   main-is:             Main.hs
-  ghc-options:         -O2
+  ghc-options:         -O2 -threaded
   build-depends:       base
                      , fileFinder
                      , transformers >= 0.5
