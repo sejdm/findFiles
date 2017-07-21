@@ -61,7 +61,7 @@ keepSearching'' f s =
   do (e , o, _) <- liftIO $ readCreateProcessWithExitCode (shell ("cat " ++ f ++ " | fzf -q '" ++ T.unpack s ++ "'")) ""
      if e == ExitSuccess then return o else throwError "Cannot find the file " 
 
-keepSearching' f s = do x <- liftIO $ fmap (reverse . tail . reverse) $ catch (readCreateProcess (shell ("cat " ++ f ++ " | fzf -q '" ++ T.unpack s ++ "'")) "") ((\_ -> return "a") :: IOError -> IO String)
+keepSearching' f s = do x <- liftIO $ fmap (reverse . tail . reverse) $ catch (readCreateProcess (shell ("cat " ++ f ++ " | fzf --height=10% -q '" ++ T.unpack s ++ "'")) "") ((\_ -> return "a") :: IOError -> IO String)
                         if x == "" then throwError "Cannot find the file" else return x
 
 keepSearching :: (MonadIO m, MonadError String m) => Settings -> [T.Text] -> T.Text -> m FilePath
